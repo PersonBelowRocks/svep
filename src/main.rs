@@ -27,6 +27,20 @@ struct Vertex {
 
 implement_vertex!(Vertex, position);
 
+fn filled_chunk(chunk_pos: (f32, f32, f32)) -> chunks::Chunk {
+    let mut voxels: Vec<Vec<Vec<Option<chunks::Voxel>>>> = vec![vec![vec![None; 128]; 128]; 128];
+
+    for i in 0..128 {
+        for ii in 0..128 {
+            for iii in 0..128 {
+                voxels[i][ii][iii] = Some(Voxel::new_anon((i as f32, ii as f32, iii as f32)))
+            }
+        }
+    }
+
+    chunks::Chunk::new(chunk_pos, voxels)
+}
+
 fn main() {
     /*
     //
@@ -313,8 +327,8 @@ fn main() {
         controller.load_chunk(chunk);
 
         let mut chunk = chunks::Chunk::new(
-            (-1.0, 1.0, 0.0),
-            voxels // .clone()
+            (1.0, 1.0, 0.0),
+            voxels.clone() // .clone()
         );
 
         controller.load_chunk(chunk);
@@ -326,15 +340,13 @@ fn main() {
 
         let mut right: f32 = 0.0;
         let mut fwd: f32 = 0.0;
+        let mut up: f32 = 0.0;
 
         let mut pitch: f32 = 0.0;
         let mut yaw: f32 = 0.0;
 
         loop {
             let now = Instant::now().duration_since(then).as_secs_f32();
-
-            // let yaw_r: f32 = (yaw as f32) * (nalgebra_glm::pi::<f32>()/180.0);
-            // let pitch_r: f32 = (pitch as f32) * (nalgebra_glm::pi::<f32>()/180.0);
 
             let x = -yaw.sin() * pitch.cos();
             let y = pitch.sin();
@@ -378,6 +390,12 @@ fn main() {
                             },
                             D => {
                                 right += 1.0;
+                            },
+                            SPACE => {
+                                up += 1.0;
+                            },
+                            LSHIFT => {
+                                up += -1.0;
                             }
                             _ => (),
                         }
@@ -395,6 +413,12 @@ fn main() {
                             },
                             D => {
                                 right -= 1.0;
+                            },
+                            SPACE => {
+                                up -= 1.0;
+                            },
+                            LSHIFT => {
+                                up -= -1.0;
                             }
                             _ => ()
                         }
@@ -402,9 +426,10 @@ fn main() {
                 }
                 fwd = fwd.clamp(-1.0, 1.0);
                 right = right.clamp(-1.0, 1.0);
+                up = up.clamp(-1.0, 1.0);
             }
 
-            pos += ((pointing * fwd) + (pointing_right * right)) * 0.1;
+            pos += ((pointing * fwd) + (pointing_right * right) + (Vec3::new(0.0, 1.0, 0.0) * up)) * 0.1;
 
             controller.set_camera(&pos, &pointing);
             std::thread::sleep(Duration::from_nanos(100));

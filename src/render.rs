@@ -30,7 +30,6 @@ pub struct ChunkRenderer {
 impl ChunkRenderer {
     pub fn make(vertex_source: &str, fragment_source: &str) -> (Self, RenderController) {
         use std::sync::mpsc;
-
         use glium::glutin;
 
         let (chunk_tx, chunk_rx) = mpsc::channel::<ChunkRenderOp>();
@@ -45,6 +44,9 @@ impl ChunkRenderer {
         let wb = glutin::window::WindowBuilder::new().with_title("wowza!");
         let cb = glutin::ContextBuilder::new().with_depth_buffer(24);
         let display = glium::Display::new(wb, cb, &event_loop).unwrap();
+
+        display.gl_window().window().set_cursor_grab(true);
+        display.gl_window().window().set_cursor_visible(false);
 
         // Compile shaders.
         let shaders = glium::Program::from_source(
@@ -95,6 +97,8 @@ impl ChunkRenderer {
             [0.0, 0.0, 0.0, 1.0f32]
         ]);
 
+        let mut is_focused = false;
+        let mut cursor_on_window = false;
 
         use std::time::{Instant, Duration};
 
@@ -134,40 +138,57 @@ impl ChunkRenderer {
                         *control_flow = glutin::event_loop::ControlFlow::Exit;
                         return;
                     },
+                    // Tracks the window's focused state.
+                    glutin::event::WindowEvent::Focused(state) => is_focused = state,
+                    glutin::event::WindowEvent::CursorEntered { .. } => {
+                        self.display.gl_window().window().set_cursor_visible(!is_focused);
+                        cursor_on_window = is_focused;
+                    },
+                    glutin::event::WindowEvent::CursorLeft { .. } => {
+                        self.display.gl_window().window().set_cursor_visible(!is_focused);
+                        cursor_on_window = is_focused;
+                    },
                     _ => return,
                 },
-                glutin::event::Event::DeviceEvent { event, .. } => match event {
-                    glutin::event::DeviceEvent::MouseMotion { delta } => {
-                        let result = self.mouse_tx.try_send(delta);
-                        match result {
-                            Err(error) => {
-                                match error {
-                                    TrySendError::Full(_) => (),
-                                    _ => panic!()
+                glutin::event::Event::DeviceEvent { event, .. } => {
+                    if is_focused && cursor_on_window {
+                        match event {
+
+                            glutin::event::DeviceEvent::MouseMotion { delta } => {
+                                let result = self.mouse_tx.try_send(delta);
+                                match result {
+                                    Err(error) => {
+                                        match error {
+                                            TrySendError::Full(_) => (),
+                                            _ => panic!()
+                                        }
+                                    }
+                                    _ => ()
+                                }
+                            },
+                            glutin::event::DeviceEvent::Key(kb) => {
+                                let key = match kb.state {
+                                    glutin::event::ElementState::Pressed => KeyEvent::KeyDown(kb.scancode),
+                                    glutin::event::ElementState::Released => KeyEvent::KeyUp(kb.scancode)
+                                };
+                                let result = self.keyboard_tx.try_send(key);
+                                match result {
+                                    Err(error) => {
+                                        match error {
+                                            TrySendError::Full(_) => (),
+                                            _ => panic!()
+                                        }
+                                    }
+                                    _ => ()
                                 }
                             }
-                            _ => ()
-                        }
-                    },
-                    glutin::event::DeviceEvent::Key(kb) => {
-                        let key = match kb.state {
-                            glutin::event::ElementState::Pressed => KeyEvent::KeyDown(kb.scancode),
-                            glutin::event::ElementState::Released => KeyEvent::KeyUp(kb.scancode)
-                        };
-                        let result = self.keyboard_tx.try_send(key);
-                        match result {
-                            Err(error) => {
-                                match error {
-                                    TrySendError::Full(_) => (),
-                                    _ => panic!()
-                                }
-                            }
-                            _ => ()
+                            _ => (),
                         }
                     }
-                    _ => (),
                 },
                 glutin::event::Event::MainEventsCleared => {
+
+                    // let mut surface = glium::
                     let mut target = self.display.draw();
 
                     // todo: use nalgebra_glm's perspective matrix instead.
