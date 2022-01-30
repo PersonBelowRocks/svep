@@ -1,0 +1,15 @@
+[package]
+name = "svep"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+glium = "*"
+toml = "*"
+image = "*"
+impl_ops = "*"
+nalgebra-glm = "*"
+obj = { version = "*", features = ["genmesh"] }
+rand = "*"
+hashbrown = "*"
+rayon = "*"

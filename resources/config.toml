@@ -1,0 +1,2 @@
+# todo: should be a file with configs/settings for the engine, such as fov, mouse sensitivity, and maybe things like
+#   chunk size, voxel scale, and paths to shaders.
