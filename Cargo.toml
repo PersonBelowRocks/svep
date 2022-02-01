@@ -6,10 +6,17 @@ edition = "2021"
 [dependencies]
 glium = "*"
 toml = "*"
-image = "*"
-impl_ops = "*"
 nalgebra-glm = "*"
 obj = { version = "*", features = ["genmesh"] }
 rand = "*"
 hashbrown = "*"
-rayon = "*"
+vulkano = "0.27.1"
+vulkano-shaders = { version = "0.27.1", features = ["shaderc-build-from-source"] }
+vulkano-win = "0.27.1"
+winit = "0.25"
+
+shaderc = "0.7.4"
+shaderc-sys = "0.7.4"
+
+[features]
+shaderc_fix = ["shaderc/build-from-source"]
