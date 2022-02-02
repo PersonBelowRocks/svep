@@ -13,6 +13,10 @@ layout(set = 0, binding = 0) uniform Data {
 } uniforms;
 
 void main() {
+    if (normal.z < 0.0) {
+        return;
+    }
+
     mat4 worldview = uniforms.view * uniforms.world;
      v_normal = transpose(inverse(mat3(worldview))) * normal;
     // v_normal = normal;//
