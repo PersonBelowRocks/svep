@@ -4,12 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-glium = "*"
-toml = "*"
-image = "*"
-impl_ops = "*"
-nalgebra-glm = "*"
-obj = { version = "*", features = ["genmesh"] }
-rand = "*"
-hashbrown = "*"
-rayon = "*"
+wgpu = "0.12.0"
+winit = "0.26.1"
+cgmath = "0.18.0"
+env_logger = "0.9.0"
+pollster = "0.2.5"
