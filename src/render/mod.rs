@@ -1,1 +1,1 @@
-mod voxel;
+pub(crate) mod vertex;

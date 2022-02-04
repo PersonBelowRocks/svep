@@ -53,19 +53,27 @@ impl<T, const SIZE: usize> From<Volume<T, SIZE>> for [[[T; SIZE]; SIZE]; SIZE] {
 }
 
 impl<T, const SIZE: usize> Volume<T, SIZE> {
-    fn filled(item: T) -> Self where T: Copy {
+    pub(crate) fn filled(item: T) -> Self where T: Copy {
         Self { 0: [[[item; SIZE]; SIZE]; SIZE] }
     }
 
-    fn iter(&self) -> VolumeIterator<T, SIZE> {
+    pub(crate) fn iter(&self) -> VolumeIterator<T, SIZE> {
         VolumeIterator {
             vol: self,
             idx: (0, 0, 0)
         }
     }
 
-    fn iter_indices(&self) -> VolumeIndexIterator<SIZE> {
+    pub(crate) fn iter_indices(&self) -> VolumeIndexIterator<SIZE> {
         VolumeIndexIterator { 0: (0, 0, 0) }
+    }
+    
+    pub(crate) fn get(&self, idx: VolumeIdx) -> Option<&T> {
+        if idx.0 >= SIZE || idx.1 >= SIZE || idx.2 >= SIZE {
+            None
+        } else {
+            Some(&self[idx])
+        }
     }
 }
 
