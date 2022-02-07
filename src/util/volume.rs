@@ -4,19 +4,19 @@ use std::ops;
 use std::fmt;
 
 /// 3 Dimensional volume of data
-pub(crate) struct Volume<T: Sized, const SIZE: usize>([[[T; SIZE]; SIZE]; SIZE]);
+pub struct Volume<T: Sized, const SIZE: usize>([[[T; SIZE]; SIZE]; SIZE]);
 
 /// Iterator over a 3D volume
-pub(crate) struct VolumeIterator<'volume, T: Sized, const SIZE: usize> {
+pub struct VolumeIterator<'volume, T: Sized, const SIZE: usize> {
     vol: &'volume Volume<T, SIZE>,
     idx: VolumeIdx
 }
 
 /// Iterator over the indices in a volume. Can be used instead of mutable iterators.
-pub(crate) struct VolumeIndexIterator<const SIZE: usize>(VolumeIdx);
+pub struct VolumeIndexIterator<const SIZE: usize>(VolumeIdx);
 
 /// This type may be used to index a Volume
-pub(crate) type VolumeIdx = (usize, usize, usize);
+pub type VolumeIdx = (usize, usize, usize);
 
 impl<T, const SIZE: usize> ops::Index<VolumeIdx> for Volume<T, SIZE> {
     type Output = T;
@@ -53,22 +53,22 @@ impl<T, const SIZE: usize> From<Volume<T, SIZE>> for [[[T; SIZE]; SIZE]; SIZE] {
 }
 
 impl<T, const SIZE: usize> Volume<T, SIZE> {
-    pub(crate) fn filled(item: T) -> Self where T: Copy {
+    pub fn filled(item: T) -> Self where T: Copy {
         Self { 0: [[[item; SIZE]; SIZE]; SIZE] }
     }
 
-    pub(crate) fn iter(&self) -> VolumeIterator<T, SIZE> {
+    pub fn iter(&self) -> VolumeIterator<T, SIZE> {
         VolumeIterator {
             vol: self,
             idx: (0, 0, 0)
         }
     }
 
-    pub(crate) fn iter_indices(&self) -> VolumeIndexIterator<SIZE> {
+    pub fn iter_indices(&self) -> VolumeIndexIterator<SIZE> {
         VolumeIndexIterator { 0: (0, 0, 0) }
     }
     
-    pub(crate) fn get(&self, idx: VolumeIdx) -> Option<&T> {
+    pub fn get(&self, idx: VolumeIdx) -> Option<&T> {
         if idx.0 >= SIZE || idx.1 >= SIZE || idx.2 >= SIZE {
             None
         } else {

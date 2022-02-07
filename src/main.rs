@@ -1,5 +1,11 @@
+#[macro_use]
+extern crate lazy_static;
+
 mod systems;
 mod components;
+
+mod world;
+mod util;
 
 use bevy::prelude::*;
 

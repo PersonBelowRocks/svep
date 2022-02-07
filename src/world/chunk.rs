@@ -1,8 +1,7 @@
 #![allow(unused)]
-use crate::util::Volume;
-use crate::render::vertex::Vertex;
+use bevy::prelude::*;
+use crate::util::{Volume, VolumeIdx, FaceVectors};
 use super::voxel::Voxel;
-use cgmath::Vector3;
 
 pub(crate) const CHUNK_SIZE: usize = 32;
 pub(crate) type ChunkPosition = (u32, u32, u32);
@@ -14,21 +13,13 @@ pub(crate) struct Chunk {
 }
 
 pub(crate) struct ChunkMesh {
-    vertices: Vec<Vertex>,
+    vertices: Vec<(Vec3, Vec3, Vec2)>
 }
 
-enum FaceGeometry {
-    UP = [
-        Vector3::new(-0.5, 0.5, 0.5),
-        Vector3::new(0.5, 0.5, 0.5),
-        Vector3::new(-0.5, 0.5, -0.5),
-
-    ], // +Y
-    DOWN = todo!(), // -Y
-    NORTH = todo!(), // -Z
-    EAST = todo!(), // +X
-    SOUTH = todo!(), // +Z
-    WEST = todo!(), // -X
+impl ChunkMesh {
+    fn empty() -> Self {
+        Self { vertices: Vec::new() }
+    }
 }
 
 impl Chunk {
@@ -51,13 +42,123 @@ impl Chunk {
     }
 
     pub(crate) fn create_mesh(&self) -> ChunkMesh {
-        let mut vertices: Vec<Vertex> = Vec::new();
+        let mut mesh = ChunkMesh::empty();
 
         for (idx, voxel) in self.volume.iter() {
             if !voxel.active { continue; }
 
+            for (direction, neighbor_idx) in NeighborIterator::from_idx(idx) {
+                let neighbor_voxel = self.volume[neighbor_idx];
+                if !neighbor_voxel.active {
+                    let neighbor_pos = volume_idx_to_vec(neighbor_idx);
 
+                    for vertex in direction.get_face_mesh() {
+                        mesh.vertices.push((
+                                vertex + neighbor_pos,
+                                direction.get_face_normal(),
+                                Vec2::new(1.0, 1.0)
+                            ));
+                    }
+                }
+            }
+        }
+
+        mesh
+    }
+}
+
+#[derive(Copy, Clone)]
+enum Direction {
+    UP,
+    DOWN,
+    NORTH,
+    EAST,
+    SOUTH,
+    WEST
+}
+
+impl Direction {
+    fn get_face_mesh(&self) -> FaceVectors {
+        use crate::util::{
+            FACE_UP,
+            FACE_DOWN,
+            FACE_NORTH,
+            FACE_EAST,
+            FACE_SOUTH,
+            FACE_WEST
+        };
+
+        match self {
+            Self::UP => *FACE_UP,
+            Self::DOWN => *FACE_DOWN,
+            Self::NORTH => *FACE_NORTH,
+            Self::EAST => *FACE_EAST,
+            Self::SOUTH => *FACE_SOUTH,
+            Self::WEST => *FACE_WEST
+        }
+    }
+
+    fn get_face_normal(&self) -> Vec3 {
+        use crate::util::{
+            UP_NORMAL,
+            DOWN_NORMAL,
+            NORTH_NORMAL,
+            EAST_NORMAL,
+            SOUTH_NORMAL,
+            WEST_NORMAL
+        };
+
+        match self {
+            Self::UP => *UP_NORMAL,
+            Self::DOWN => *DOWN_NORMAL,
+            Self::NORTH => *NORTH_NORMAL,
+            Self::EAST => *EAST_NORMAL,
+            Self::SOUTH => *SOUTH_NORMAL,
+            Self::WEST => *WEST_NORMAL
         }
     }
 }
 
+struct NeighborIterator {
+    neighbor_indices: [Option<(Direction, VolumeIdx)>; 6],
+    current_idx: usize
+}
+
+impl NeighborIterator {
+    fn from_idx(idx: VolumeIdx) -> Self {
+        let mut idxs = [None; 6];
+
+        if idx.0 + 1 < CHUNK_SIZE { idxs[0] = Some((Direction::EAST, (idx.0 + 1, idx.1, idx.2))) }
+        if idx.0.checked_sub(1).is_some() { idxs[1] = Some((Direction::WEST, (idx.0 - 1, idx.1, idx.2))) }
+
+        if idx.1 + 1 < CHUNK_SIZE { idxs[2] = Some((Direction::UP, (idx.0, idx.1 + 1, idx.2))) }
+        if idx.1.checked_sub(1).is_some() { idxs[3] = Some((Direction::DOWN, (idx.0, idx.1 - 1, idx.2))) }
+
+        if idx.2 + 1 < CHUNK_SIZE { idxs[4] = Some((Direction::SOUTH, (idx.0, idx.1, idx.2 + 1))) }
+        if idx.2.checked_sub(1).is_some() { idxs[5] = Some((Direction::NORTH, (idx.0, idx.1, idx.2 - 1))) }
+
+        Self {
+            neighbor_indices: idxs,
+            current_idx: 0
+        }
+    }
+}
+
+impl Iterator for NeighborIterator {
+    type Item = (Direction, VolumeIdx);
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.current_idx < 6 {
+            let last_idx = self.current_idx;
+            self.current_idx += 1;
+            if let Some(idx) = self.neighbor_indices[last_idx] {
+                return Some(idx);
+            }
+        }
+
+        None
+    }
+}
+
+fn volume_idx_to_vec(idx: VolumeIdx) -> Vec3 {
+    Vec3::new(idx.0 as f32, idx.1 as f32, idx.2 as f32)
+}
