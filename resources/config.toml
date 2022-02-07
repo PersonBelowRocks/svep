@@ -1,2 +1,6 @@
 # todo: should be a file with configs/settings for the engine, such as fov, mouse sensitivity, and maybe things like
 #   chunk size, voxel scale, and paths to shaders.
+
+[controls]
+mouse_sens = 0.05
+move_speed = 0.125
