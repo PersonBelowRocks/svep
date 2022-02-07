@@ -1,5 +1,6 @@
 #![allow(unused)]
 use bevy::prelude::*;
+use bevy::render::render_resource::PrimitiveTopology;
 use crate::util::{Volume, VolumeIdx, FaceVectors};
 use super::voxel::Voxel;
 
@@ -22,7 +23,48 @@ impl ChunkMesh {
     }
 }
 
+#[allow(clippy::from_over_into)]
+impl Into<Mesh> for ChunkMesh {
+    fn into(self) -> Mesh {
+        let mut out = Mesh::new(PrimitiveTopology::TriangleList);
+
+        out.set_attribute(Mesh::ATTRIBUTE_POSITION,
+                          self
+                              .vertices
+                              .iter()
+                              .map(|a| a.0.to_array())
+                              .collect::<Vec<_>>());
+
+        out.set_attribute(Mesh::ATTRIBUTE_NORMAL,
+                          self
+                              .vertices
+                              .iter()
+                              .map(|a| a.1.to_array())
+                              .collect::<Vec<_>>());
+
+        out.set_attribute(Mesh::ATTRIBUTE_COLOR,
+                          (0..self.vertices.len()).map(|_| [0.5, 0.5, 0.82, 1.0])
+                              .collect::<Vec<_>>());
+
+        out
+    }
+}
+
 impl Chunk {
+    pub(crate) fn example_chunk() -> Self {
+        let mut volume = Volume::filled(Voxel::inactive());
+
+        volume[(5, 5, 5)].active = true;
+        volume[(5, 4, 5)].active = true;
+        volume[(5, 6, 5)].active = true;
+
+        Self {
+            position: (1, 0, 0),
+            empty: false,
+            volume
+        }
+    }
+
     pub(crate) fn random_chunk(position: ChunkPosition) -> Self {
         let mut volume = Volume::filled(Voxel::inactive());
         let mut empty = true;
@@ -62,6 +104,8 @@ impl Chunk {
                 }
             }
         }
+        println!("{:?}", mesh.vertices);
+        println!("vertex count: {}", mesh.vertices.len());
 
         mesh
     }

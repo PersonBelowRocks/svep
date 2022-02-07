@@ -2,6 +2,15 @@ use bevy::prelude::*;
 
 pub(crate) type FaceVectors = [Vec3; 6];
 
+const MAX_X: f32 = 0.5;
+const MIN_X: f32 = -0.5;
+const MAX_Y: f32 = 0.5;
+const MIN_Y: f32 = -0.5;
+const MAX_Z: f32 = 0.5;
+const MIN_Z: f32 = -0.5;
+
+// TODO: these face meshes are broken, something about the order of the vertices
+//  completely breaks bevy's renderer.
 lazy_static! {
     // +Y
     pub(crate) static ref UP_NORMAL: Vec3 = Vec3::new(0.0, 1.0, 0.0);
