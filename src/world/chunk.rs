@@ -6,7 +6,7 @@ use crate::util::{Volume, VolumeIdx, FaceVectors, FaceMesh};
 use super::voxel::Voxel;
 
 pub(crate) const CHUNK_SIZE: usize = 32;
-pub(crate) type ChunkPosition = (u32, u32, u32);
+pub(crate) type ChunkPosition = IVec3;
 
 pub(crate) struct Chunk {
     position: ChunkPosition,
@@ -37,34 +37,6 @@ impl Into<Mesh> for ChunkMesh {
     fn into(self) -> Mesh {
         let mut out = Mesh::new(PrimitiveTopology::TriangleList);
 
-        /*let vertices = self
-            .vertices
-            .iter()
-            .map(|a| a.0.to_array())
-            .collect::<Vec<_>>();
-
-        println!("vertices going to GPU mem: {:?}", &vertices);
-        out.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
-
-        out.set_attribute(Mesh::ATTRIBUTE_NORMAL,
-                          self
-                              .vertices
-                              .iter()
-                              .map(|a| a.1.to_array())
-                              .collect::<Vec<_>>());
-
-        out.set_attribute(Mesh::ATTRIBUTE_COLOR,
-                          (0..self.vertices.len()).map(|_| [0.5, 0.5, 0.82, 1.0])
-                              .collect::<Vec<_>>());
-
-        out.set_indices(Some(Indices::U32(
-            (0u32..(self.vertices.len() as u32)).collect::<Vec<u32>>()
-        )));*/
-
-        //println!("vertices: {:?}\n", &self.vertices);
-        //println!("normals: {:?}\n", &self.normals);
-        //println!("indices: {:?}\n", &self.indices);
-
         out.set_attribute(Mesh::ATTRIBUTE_POSITION, self.vertices);
         out.set_attribute(Mesh::ATTRIBUTE_NORMAL, self.normals);
         out.set_attribute(Mesh::ATTRIBUTE_UV_0, self.uvs);
@@ -75,36 +47,39 @@ impl Into<Mesh> for ChunkMesh {
 }
 
 impl Chunk {
-    pub(crate) fn example_chunk() -> Self {
-        let mut volume = Volume::filled(Voxel::inactive());
-
-        volume[(5, 5, 5)].active = true;
-        volume[(5, 4, 5)].active = true;
-        volume[(5, 6, 5)].active = true;
+    pub(crate) fn random_chunk(position: ChunkPosition) -> Self {
+        //let mut volume = Volume::filled(Voxel::inactive());
+        // let mut empty = true;
+        //
+        // for idx in volume.iter_indices() {
+        //     if rand::random::<f32>() > 0.075 {
+        //         volume[idx].active = true;
+        //         empty = false;
+        //     }
+        // }
 
         Self {
-            position: (1, 0, 0),
+            position,
             empty: false,
-            volume
+            volume: Volume::filled(Voxel::active())
         }
     }
 
-    pub(crate) fn random_chunk(position: ChunkPosition) -> Self {
-        let mut volume = Volume::filled(Voxel::inactive());
+    pub(crate) fn new(position: ChunkPosition, data: Volume<Voxel, CHUNK_SIZE>) -> Self {
         let mut empty = true;
-
-        for idx in volume.iter_indices() {
-            if rand::random::<f32>() > 0.075 {
-                volume[idx].active = true;
-                empty = false;
-            }
+        if data.iter().any(|(_, v)| v.active) {
+            empty = false;
         }
 
         Self {
             position,
+            volume: data,
             empty,
-            volume
         }
+    }
+
+    pub(crate) fn position(&self) -> ChunkPosition {
+        self.position
     }
 
     pub(crate) fn create_mesh(&self) -> ChunkMesh {
@@ -120,29 +95,43 @@ impl Chunk {
                 if !neighbor_voxel.active {
                     let neighbor_pos = volume_idx_to_vec(neighbor_idx);
 
-                    // TODO: mesh is "backwards", so triangles facing you are culled instead of the
-                    //  reverse. lighting is also messed up. investigate and fix!
+                    // todo: we're currently adding vertex positions in reverse and negating normals;
+                    //  fix the underlying model instead of doing all this extra work
+                    let mut buf: Vec<[f32; 3]> = Vec::new();
+
                     for vertex in direction.get_face_mesh() {
-                        // Vertex position
-                        mesh.vertices.push( (Vec3::from(vertex.0) + this_pos).into() );
-                        // mesh.vertices.push(vertex.0);
-                        // Vertex normal
-                        mesh.normals.push(vertex.1);
-                        // Vertex uv coords
+                        // Vertex position, added in reverse cause model is weird
+                        buf.push((Vec3::from(vertex.0) + this_pos).into());
+
+                        // Vertex normal, negated for same reason as above
+                        mesh.normals.push((-Vec3::from(vertex.1)).into());
+
+                        // Vertex uv coords, probably also broken in some way
                         mesh.uvs.push(vertex.2);
 
                     }
+
+                    buf.reverse();
+                    mesh.vertices.append(&mut buf);
+
+                    // We could just add the vertices with duplicates and interpret the entire buffer as a TriangleList
+                    // which would be simpler but take up more memory, so we do this instead.
                     for index_offset in [0, 1, 2, 2, 3, 0u32] {
                         mesh.indices.push(index_offset + current_index);
                     }
+                    // Each voxel face requires 4 vertices (2 triangles)
                     current_index += 4;
                 }
             }
         }
-        //println!("{:?}", mesh.vertices);
-        //println!("vertex count: {}", mesh.vertices.len());
 
         mesh
+    }
+}
+
+impl From<Chunk> for Volume<Voxel, CHUNK_SIZE> {
+    fn from(chunk: Chunk) -> Self {
+        chunk.volume
     }
 }
 
@@ -176,26 +165,6 @@ impl Direction {
             Self::WEST => *NX_FACE
         }
     }
-
-/*    fn get_face_normal(&self) -> Vec3 {
-        use crate::util::{
-            UP_NORMAL,
-            DOWN_NORMAL,
-            NORTH_NORMAL,
-            EAST_NORMAL,
-            SOUTH_NORMAL,
-            WEST_NORMAL
-        };
-
-        match self {
-            Self::UP => *UP_NORMAL,
-            Self::DOWN => *DOWN_NORMAL,
-            Self::NORTH => *NORTH_NORMAL,
-            Self::EAST => *EAST_NORMAL,
-            Self::SOUTH => *SOUTH_NORMAL,
-            Self::WEST => *WEST_NORMAL
-        }
-    }*/
 }
 
 struct NeighborIterator {

@@ -1,3 +1,4 @@
 pub(crate) mod chunk;
-mod manager;
+pub(crate) mod manager;
+
 mod voxel;
