@@ -26,6 +26,20 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+
+    commands.spawn_bundle(PbrBundle {
+        mesh: meshes.add(world::chunk::Chunk::random_chunk((1, 0, 0)).create_mesh().into()),
+        material: materials.add(StandardMaterial {
+            base_color: Color::rgb(0.6, 0.6, 0.6),
+            metallic: 0.0,
+            perceptual_roughness: 0.6,
+            reflectance: 0.001,
+            .. Default::default()
+        }),
+        transform: Transform::from_translation(Vec3::new(1.0*32.0, 0.0, 0.0)),
+        ..Default::default()
+    });
+
     // plane
     commands.spawn_bundle(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Plane { size: 500.0 })),
@@ -44,19 +58,6 @@ fn setup(
         mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
         material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
         transform: Transform::from_xyz(0.0, 0.5, 0.0),
-        ..Default::default()
-    });
-
-    commands.spawn_bundle(PbrBundle {
-        mesh: meshes.add(world::chunk::Chunk::example_chunk().create_mesh().into()),
-        material: materials.add(StandardMaterial {
-            base_color: Color::rgb(0.6, 0.6, 0.6),
-            metallic: 0.0,
-            perceptual_roughness: 0.6,
-            reflectance: 0.001,
-            .. Default::default()
-        }),
-        transform: Transform::from_translation(Vec3::new(1.0*32.0, 0.0, 0.0)),
         ..Default::default()
     });
 

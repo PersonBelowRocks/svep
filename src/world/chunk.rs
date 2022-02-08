@@ -1,7 +1,8 @@
 #![allow(unused)]
 use bevy::prelude::*;
+use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
-use crate::util::{Volume, VolumeIdx, FaceVectors};
+use crate::util::{Volume, VolumeIdx, FaceVectors, FaceMesh};
 use super::voxel::Voxel;
 
 pub(crate) const CHUNK_SIZE: usize = 32;
@@ -14,12 +15,20 @@ pub(crate) struct Chunk {
 }
 
 pub(crate) struct ChunkMesh {
-    vertices: Vec<(Vec3, Vec3, Vec2)>
+    vertices: Vec<[f32; 3]>,
+    normals: Vec<[f32; 3]>,
+    uvs: Vec<[f32; 2]>,
+    indices: Vec<u32>
 }
 
 impl ChunkMesh {
     fn empty() -> Self {
-        Self { vertices: Vec::new() }
+        Self {
+            vertices: Vec::new(),
+            normals: Vec::new(),
+            uvs: Vec::new(),
+            indices: Vec::new(),
+        }
     }
 }
 
@@ -28,12 +37,14 @@ impl Into<Mesh> for ChunkMesh {
     fn into(self) -> Mesh {
         let mut out = Mesh::new(PrimitiveTopology::TriangleList);
 
-        out.set_attribute(Mesh::ATTRIBUTE_POSITION,
-                          self
-                              .vertices
-                              .iter()
-                              .map(|a| a.0.to_array())
-                              .collect::<Vec<_>>());
+        /*let vertices = self
+            .vertices
+            .iter()
+            .map(|a| a.0.to_array())
+            .collect::<Vec<_>>();
+
+        println!("vertices going to GPU mem: {:?}", &vertices);
+        out.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
 
         out.set_attribute(Mesh::ATTRIBUTE_NORMAL,
                           self
@@ -45,6 +56,19 @@ impl Into<Mesh> for ChunkMesh {
         out.set_attribute(Mesh::ATTRIBUTE_COLOR,
                           (0..self.vertices.len()).map(|_| [0.5, 0.5, 0.82, 1.0])
                               .collect::<Vec<_>>());
+
+        out.set_indices(Some(Indices::U32(
+            (0u32..(self.vertices.len() as u32)).collect::<Vec<u32>>()
+        )));*/
+
+        //println!("vertices: {:?}\n", &self.vertices);
+        //println!("normals: {:?}\n", &self.normals);
+        //println!("indices: {:?}\n", &self.indices);
+
+        out.set_attribute(Mesh::ATTRIBUTE_POSITION, self.vertices);
+        out.set_attribute(Mesh::ATTRIBUTE_NORMAL, self.normals);
+        out.set_attribute(Mesh::ATTRIBUTE_UV_0, self.uvs);
+        out.set_indices(Some(Indices::U32(self.indices)));
 
         out
     }
@@ -70,7 +94,7 @@ impl Chunk {
         let mut empty = true;
 
         for idx in volume.iter_indices() {
-            if rand::random::<f32>() > 0.33 {
+            if rand::random::<f32>() > 0.075 {
                 volume[idx].active = true;
                 empty = false;
             }
@@ -85,27 +109,38 @@ impl Chunk {
 
     pub(crate) fn create_mesh(&self) -> ChunkMesh {
         let mut mesh = ChunkMesh::empty();
+        let mut current_index = 0u32;
 
         for (idx, voxel) in self.volume.iter() {
             if !voxel.active { continue; }
+            let this_pos = volume_idx_to_vec(idx);
 
             for (direction, neighbor_idx) in NeighborIterator::from_idx(idx) {
                 let neighbor_voxel = self.volume[neighbor_idx];
                 if !neighbor_voxel.active {
                     let neighbor_pos = volume_idx_to_vec(neighbor_idx);
 
+                    // TODO: mesh is "backwards", so triangles facing you are culled instead of the
+                    //  reverse. lighting is also messed up. investigate and fix!
                     for vertex in direction.get_face_mesh() {
-                        mesh.vertices.push((
-                                vertex + neighbor_pos,
-                                direction.get_face_normal(),
-                                Vec2::new(1.0, 1.0)
-                            ));
+                        // Vertex position
+                        mesh.vertices.push( (Vec3::from(vertex.0) + this_pos).into() );
+                        // mesh.vertices.push(vertex.0);
+                        // Vertex normal
+                        mesh.normals.push(vertex.1);
+                        // Vertex uv coords
+                        mesh.uvs.push(vertex.2);
+
                     }
+                    for index_offset in [0, 1, 2, 2, 3, 0u32] {
+                        mesh.indices.push(index_offset + current_index);
+                    }
+                    current_index += 4;
                 }
             }
         }
-        println!("{:?}", mesh.vertices);
-        println!("vertex count: {}", mesh.vertices.len());
+        //println!("{:?}", mesh.vertices);
+        //println!("vertex count: {}", mesh.vertices.len());
 
         mesh
     }
@@ -122,27 +157,27 @@ enum Direction {
 }
 
 impl Direction {
-    fn get_face_mesh(&self) -> FaceVectors {
+    fn get_face_mesh(&self) -> FaceMesh {
         use crate::util::{
-            FACE_UP,
-            FACE_DOWN,
-            FACE_NORTH,
-            FACE_EAST,
-            FACE_SOUTH,
-            FACE_WEST
+            PY_FACE,
+            NY_FACE,
+            NZ_FACE,
+            PX_FACE,
+            PZ_FACE,
+            NX_FACE
         };
 
         match self {
-            Self::UP => *FACE_UP,
-            Self::DOWN => *FACE_DOWN,
-            Self::NORTH => *FACE_NORTH,
-            Self::EAST => *FACE_EAST,
-            Self::SOUTH => *FACE_SOUTH,
-            Self::WEST => *FACE_WEST
+            Self::UP => *PY_FACE,
+            Self::DOWN => *NY_FACE,
+            Self::NORTH => *NZ_FACE,
+            Self::EAST => *PX_FACE,
+            Self::SOUTH => *PZ_FACE,
+            Self::WEST => *NX_FACE
         }
     }
 
-    fn get_face_normal(&self) -> Vec3 {
+/*    fn get_face_normal(&self) -> Vec3 {
         use crate::util::{
             UP_NORMAL,
             DOWN_NORMAL,
@@ -160,7 +195,7 @@ impl Direction {
             Self::SOUTH => *SOUTH_NORMAL,
             Self::WEST => *WEST_NORMAL
         }
-    }
+    }*/
 }
 
 struct NeighborIterator {
