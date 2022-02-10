@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use std::f32::consts::PI;
 use bevy::input::mouse::MouseMotion;
 use crate::components::Player;
+use crate::util::PlayerMoveEvent;
 
 const MOUSE_SENSITIVITY: f32 = 0.05;
 
@@ -27,27 +28,36 @@ pub(crate) fn mouse_controls(mut rot: Local<Rotation>, mut events: EventReader<M
     trans.rotation = Quat::from_axis_angle(Vec3::Y, rot.1) * Quat::from_axis_angle(-Vec3::X, rot.0);
 }
 
-pub(crate) fn keyboard_controls(kb: Res<Input<KeyCode>>, mut player: Query<&mut Transform, With<Player>>) {
-    let mut trans = player.single_mut();
+pub(crate) fn keyboard_controls(mut writer: EventWriter<PlayerMoveEvent>, kb: Res<Input<KeyCode>>, mut query: Query<(Entity, &mut Transform, &mut Player)>) {
+    let (entity, mut trans, mut player) = query.single_mut();
     let local_fwd = trans.forward();
     let local_right = trans.right();
 
+    let mut movement = Vec3::new(0., 0., 0.);
+
     if kb.pressed(KeyCode::Space) {
-        trans.translation.y += 0.125;
+        movement.y += 0.125;
     }
     if kb.pressed(KeyCode::LShift) {
-        trans.translation.y -= 0.125;
+        movement.y -= 0.125;
     }
     if kb.pressed(KeyCode::W) {
-        trans.translation += local_fwd * 0.125;
+        movement += local_fwd * 0.125;
     }
     if kb.pressed(KeyCode::S) {
-        trans.translation -= local_fwd * 0.125;
+        movement -= local_fwd * 0.125;
     }
     if kb.pressed(KeyCode::D) {
-        trans.translation += local_right * 0.125;
+        movement += local_right * 0.125;
     }
     if kb.pressed(KeyCode::A) {
-        trans.translation -= local_right * 0.125;
+        movement -= local_right * 0.125;
     }
+
+    let old_position = player.position;
+
+    trans.translation += movement;
+    player.position += movement;
+
+    writer.send(PlayerMoveEvent::new(entity, old_position, player.position));
 }

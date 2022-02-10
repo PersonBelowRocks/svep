@@ -8,16 +8,20 @@ mod world;
 mod util;
 
 use bevy::prelude::*;
+use crate::util::PlayerMoveEvent;
+use crate::world::chunk::ChunkPosition;
 use crate::world::manager::ChunkManager;
 
 fn main() {
     App::new()
         .insert_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
+        .add_event::<PlayerMoveEvent>()
         .add_startup_system(setup)
         .add_system(systems::keyboard_controls)
         .add_system(systems::mouse_controls)
         .add_system(systems::skylight)
+        .add_system(systems::log_player_chunk_boundary_crossing)
         .run();
 }
 
@@ -28,25 +32,34 @@ fn setup(
 ) {
 
     let mut cm = ChunkManager::default();
+    let mut positions: Vec<ChunkPosition> = Vec::new();
 
-    for x in -10..10i32 {
-        for z in -10..10i32 {
-            for y in -3..3i32 {
-                commands.spawn_bundle(PbrBundle {
-                    mesh: meshes.add(cm.generate_new(IVec3::new(x, y, z)).create_mesh().into()),
-                    material: materials.add(StandardMaterial {
-                        base_color: Color::rgb(0.6, 0.6, 0.6),
-                        metallic: 0.0,
-                        perceptual_roughness: 0.6,
-                        reflectance: 0.001,
-                        .. Default::default()
-                    }),
-                    transform: Transform::from_translation(Vec3::new(x as f32 * 32.0, y as f32 * 32.0, z as f32 * 32.0)),
-                    ..Default::default()
-                });
+    for x in -6..=6i32 {
+        for z in -6..=6i32 {
+            for y in -6..=6i32 {
+                positions.push(ChunkPosition::new(x, y, z));
             }
-
         }
+    }
+
+    let chunk_meshes = cm.gen_mesh_multi(positions);
+
+    for mesh in chunk_meshes {
+        let pos = mesh.position();
+        let trans = Vec3::new(pos.x as f32 * 32.0, pos.y as f32 * 32.0, pos.z as f32 * 32.0);
+
+        commands.spawn_bundle(PbrBundle {
+            mesh: meshes.add(mesh.into()),
+            material: materials.add(StandardMaterial {
+                base_color: Color::rgb(0.6, 0.6, 0.6),
+                metallic: 0.0,
+                perceptual_roughness: 0.6,
+                reflectance: 0.001,
+                .. Default::default()
+            }),
+            transform: Transform::from_translation(trans),
+            ..Default::default()
+        });
     }
 
     // light

@@ -15,6 +15,7 @@ pub(crate) struct Chunk {
 }
 
 pub(crate) struct ChunkMesh {
+    position: ChunkPosition,
     vertices: Vec<[f32; 3]>,
     normals: Vec<[f32; 3]>,
     uvs: Vec<[f32; 2]>,
@@ -22,13 +23,18 @@ pub(crate) struct ChunkMesh {
 }
 
 impl ChunkMesh {
-    fn empty() -> Self {
+    fn empty(position: ChunkPosition) -> Self {
         Self {
+            position,
             vertices: Vec::new(),
             normals: Vec::new(),
             uvs: Vec::new(),
             indices: Vec::new(),
         }
+    }
+
+    pub(crate) fn position(&self) -> ChunkPosition {
+        self.position
     }
 }
 
@@ -83,7 +89,7 @@ impl Chunk {
     }
 
     pub(crate) fn create_mesh(&self) -> ChunkMesh {
-        let mut mesh = ChunkMesh::empty();
+        let mut mesh = ChunkMesh::empty(self.position());
         let mut current_index = 0u32;
 
         for (idx, voxel) in self.volume.iter() {

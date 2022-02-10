@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 #[derive(Component)]
 pub(crate) struct Player {
-    position: Vec3,
+    pub(crate) position: Vec3,
 }
 
 impl Default for Player {
