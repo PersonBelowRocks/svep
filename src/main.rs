@@ -8,6 +8,7 @@ mod world;
 mod util;
 
 use bevy::prelude::*;
+use crate::shape::Cube;
 use crate::util::PlayerMoveEvent;
 use crate::world::chunk::ChunkPosition;
 use crate::world::manager::ChunkManager;
@@ -34,9 +35,9 @@ fn setup(
     let mut cm = ChunkManager::default();
     let mut positions: Vec<ChunkPosition> = Vec::new();
 
-    for x in -6..=6i32 {
-        for z in -6..=6i32 {
-            for y in -6..=6i32 {
+    for x in -10..=10i32 {
+        for z in -10..=10i32 {
+            for y in -10..=10i32 {
                 positions.push(ChunkPosition::new(x, y, z));
             }
         }
@@ -51,7 +52,7 @@ fn setup(
         commands.spawn_bundle(PbrBundle {
             mesh: meshes.add(mesh.into()),
             material: materials.add(StandardMaterial {
-                base_color: Color::rgb(0.6, 0.6, 0.6),
+                // base_color: Color::rgb(0.6, 0.6, 0.6),
                 metallic: 0.0,
                 perceptual_roughness: 0.6,
                 reflectance: 0.001,
@@ -61,6 +62,8 @@ fn setup(
             ..Default::default()
         });
     }
+
+    use crate::shape::Cube as ABC;
 
     // light
     let size = 100.0;

@@ -10,7 +10,7 @@ use crate::util::{CPU_COUNT, Volume};
 use crate::world::chunk::{Chunk, ChunkPosition, CHUNK_SIZE, ChunkMesh};
 use crate::world::voxel::Voxel;
 
-const PERLIN_THRESHOLD: f64 = 0.33;
+const PERLIN_THRESHOLD: f64 = 0.1;
 const CHUNK_SIZE_F64: f64 = CHUNK_SIZE as f64;
 
 // The chunk manager is responsible for storing state associated with chunks and chunk generation.
@@ -58,7 +58,7 @@ const CHUNK_SIZE_F64: f64 = CHUNK_SIZE as f64;
 //                                 draw meshes for any other chunk than the one it's working on, we will
 //                                 have to submit the old chunk for re-meshing along with the new chunk.
 //
-//     3) NOT CORRECT! Current implementation gives each worker a pointer to all adjacent chunks, no
+//     3) NOT CORRECT! Current implementation GIVES each worker a pointer to all adjacent chunks, no
 //        asking is happening! This may however change in the future.
 //
 //   *---- mesh worker 1
@@ -131,7 +131,7 @@ impl ChunkManager {
             let z = (idx.2 as f64 / CHUNK_SIZE_F64) + (pos.z as f64);
 
             let noise = noisegen.get([x/2.0, y/2.0, z/2.0]);
-            if noise < PERLIN_THRESHOLD {
+            if noise > PERLIN_THRESHOLD {
                 vol[idx].active = false;
             }
         }

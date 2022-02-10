@@ -46,10 +46,12 @@ impl ChunkMesh {
 impl Into<Mesh> for ChunkMesh {
     fn into(self) -> Mesh {
         let mut out = Mesh::new(PrimitiveTopology::TriangleList);
+        let vertex_count = self.vertices.len();
 
         out.set_attribute(Mesh::ATTRIBUTE_POSITION, self.vertices);
         out.set_attribute(Mesh::ATTRIBUTE_NORMAL, self.normals);
         out.set_attribute(Mesh::ATTRIBUTE_UV_0, self.uvs);
+        // out.set_attribute(Mesh::ATTRIBUTE_COLOR, (0..vertex_count).map(|_| [0.07, 0.82, 0.33, 1.0f32]).collect::<Vec<_>>());
         out.set_indices(Some(Indices::U32(self.indices)));
 
         out
@@ -152,15 +154,16 @@ impl Chunk {
 
                     let mut buf: Vec<[f32; 3]> = Vec::with_capacity(4);
                     for (vertex, normal, uv) in face_mesh {
-                        buf.push((Vec3::from(vertex) + voxel_pos_f32).into());
+                        //buf.push((Vec3::from(vertex) + voxel_pos_f32).into());
+                        mesh.vertices.push((Vec3::from(vertex) + voxel_pos_f32).into());
 
-                        mesh.normals.push((-Vec3::from(normal)).into());
+                        mesh.normals.push((Vec3::from(normal)).into());
 
                         mesh.uvs.push(uv);
                     }
 
-                    buf.reverse();
-                    mesh.vertices.append(&mut buf);
+                    //buf.reverse();
+                    //mesh.vertices.append(&mut buf);
 
                     for index_offset in [0, 1, 2, 2, 3, 0u32] {
                         mesh.indices.push(index_offset + current_index);
