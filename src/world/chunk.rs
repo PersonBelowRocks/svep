@@ -4,8 +4,12 @@ use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
 use crate::util::{Volume, VolumeIdx, FaceVectors, FaceMesh};
 use super::voxel::Voxel;
+use std::sync::Arc;
+use bevy::utils::HashMap;
+use crate::world::manager::neighbor_vecs;
 
 pub(crate) const CHUNK_SIZE: usize = 32;
+pub(crate) const CHUNK_SIZE_I32: i32 = CHUNK_SIZE as i32;
 pub(crate) type ChunkPosition = IVec3;
 
 pub(crate) struct Chunk {
@@ -52,25 +56,16 @@ impl Into<Mesh> for ChunkMesh {
     }
 }
 
-impl Chunk {
-    pub(crate) fn random_chunk(position: ChunkPosition) -> Self {
-        //let mut volume = Volume::filled(Voxel::inactive());
-        // let mut empty = true;
-        //
-        // for idx in volume.iter_indices() {
-        //     if rand::random::<f32>() > 0.075 {
-        //         volume[idx].active = true;
-        //         empty = false;
-        //     }
-        // }
+impl std::ops::Index<IVec3> for Chunk {
+    type Output = Voxel;
 
-        Self {
-            position,
-            empty: false,
-            volume: Volume::filled(Voxel::active())
-        }
+    #[inline(always)]
+    fn index(&self, index: IVec3) -> &Self::Output {
+        &self.volume[(index.x as usize, index.y as usize, index.z as usize)]
     }
+}
 
+impl Chunk {
     pub(crate) fn new(position: ChunkPosition, data: Volume<Voxel, CHUNK_SIZE>) -> Self {
         let mut empty = true;
         if data.iter().any(|(_, v)| v.active) {
@@ -88,7 +83,98 @@ impl Chunk {
         self.position
     }
 
-    pub(crate) fn create_mesh(&self) -> ChunkMesh {
+    pub(crate) fn create_mesh(&self, neighbor_chunks: [Option<Arc<Chunk>>; 6]) -> ChunkMesh {
+        let chunk_bounds = (0..CHUNK_SIZE_I32);
+        let mut mesh = ChunkMesh::empty(self.position());
+        let mut neighbors = HashMap::from_iter(
+            neighbor_chunks
+                .into_iter()
+                .filter(|c| c.is_some())
+                .map(|c| (c.as_ref().unwrap().position(), c.unwrap()))
+        );
+
+        // We calculate offsets from this value that eventually go in the index buffer.
+        let mut current_index = 0u32;
+        for (idx, voxel) in self.volume.iter() {
+            if !voxel.active { continue; }
+
+            let voxel_pos = IVec3::new(idx.0 as i32, idx.1 as i32, idx.2 as i32);
+
+            for nb_vox_pos in neighbor_vecs(voxel_pos) {
+                let mut should_draw = false;
+
+                if !chunk_bounds.contains(&nb_vox_pos.x)
+                    || !chunk_bounds.contains(&nb_vox_pos.y)
+                    || !chunk_bounds.contains(&nb_vox_pos.z) {
+
+                    // Voxel is in another chunk
+                    let other_chunk_pos = IVec3::new(
+                        (nb_vox_pos.x as f64 / CHUNK_SIZE_I32 as f64).floor() as i32 + self.position().x,
+                        (nb_vox_pos.y as f64 / CHUNK_SIZE_I32 as f64).floor() as i32 + self.position().y,
+                        (nb_vox_pos.z as f64 / CHUNK_SIZE_I32 as f64).floor() as i32 + self.position().z,
+                    );
+
+                    // If this chunk position isn't in the hashmap it means that the chunk is not
+                    // generated. This is different from an empty chunk. Read comment below.
+                    if !(neighbors.contains_key(&other_chunk_pos)) {
+                        // It may be preferred to have this set to false so you don't render sides of
+                        // chunks that are facing non-generated terrain. But for testing it's useful
+                        // to fix the amount of terrain generated and view it while being positioned
+                        // in non-generated areas, so we'll leave this as true for now.
+                        should_draw = true;
+                    } else {
+
+                        // That chunk exists so we need to check what block is there.
+                        let nb_vox_pos_in_other_chunk = IVec3::new(
+                            nb_vox_pos.x.rem_euclid(CHUNK_SIZE_I32),
+                            nb_vox_pos.y.rem_euclid(CHUNK_SIZE_I32),
+                            nb_vox_pos.z.rem_euclid(CHUNK_SIZE_I32),
+                        );
+
+                        should_draw = !(neighbors.get(&other_chunk_pos).unwrap()[nb_vox_pos_in_other_chunk].active);
+                    }
+
+                } else {
+                    // Voxel is in the same chunk
+                    should_draw = !(self[nb_vox_pos].active);
+                }
+
+                if should_draw {
+                    let voxel_pos_f32 = Vec3::new(
+                        voxel_pos.x as f32,
+                        voxel_pos.y as f32,
+                        voxel_pos.z as f32
+                    );
+
+                    // Determine what face mesh to use for this.
+                    let direction = Direction::from_relative(voxel_pos, nb_vox_pos);
+                    let face_mesh = direction.get_face_mesh();
+
+                    let mut buf: Vec<[f32; 3]> = Vec::with_capacity(4);
+                    for (vertex, normal, uv) in face_mesh {
+                        buf.push((Vec3::from(vertex) + voxel_pos_f32).into());
+
+                        mesh.normals.push((-Vec3::from(normal)).into());
+
+                        mesh.uvs.push(uv);
+                    }
+
+                    buf.reverse();
+                    mesh.vertices.append(&mut buf);
+
+                    for index_offset in [0, 1, 2, 2, 3, 0u32] {
+                        mesh.indices.push(index_offset + current_index);
+                    }
+                    // Each voxel face requires 4 vertices (2 triangles)
+                    current_index += 4;
+                }
+            }
+        }
+
+        mesh
+    }
+
+    pub(crate) fn create_mesh_old(&self, neighbor_chunks: [Option<Arc<Chunk>>; 6]) -> ChunkMesh {
         let mut mesh = ChunkMesh::empty(self.position());
         let mut current_index = 0u32;
 
@@ -169,6 +255,22 @@ impl Direction {
             Self::EAST => *PX_FACE,
             Self::SOUTH => *PZ_FACE,
             Self::WEST => *NX_FACE
+        }
+    }
+
+    /// Determines which face of [from] points towards [to]. The two vectors have to be adjacent
+    /// to each other or else the function will panic.
+    fn from_relative(from: IVec3, to: IVec3) -> Self {
+        let direction = to - from;
+
+        match direction.to_array() {
+            [0, 1, 0] => Self::UP,
+            [0, -1, 0] => Self::DOWN,
+            [0, 0, -1] => Self::NORTH,
+            [1, 0, 0] => Self::EAST,
+            [0, 0, 1] => Self::SOUTH,
+            [-1, 0, 0] => Self::WEST,
+            _ => panic!("Vectors were not adjacent")
         }
     }
 }

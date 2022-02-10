@@ -28,6 +28,8 @@ pub(crate) fn mouse_controls(mut rot: Local<Rotation>, mut events: EventReader<M
     trans.rotation = Quat::from_axis_angle(Vec3::Y, rot.1) * Quat::from_axis_angle(-Vec3::X, rot.0);
 }
 
+const SPEED: f32 = 0.8;
+
 pub(crate) fn keyboard_controls(mut writer: EventWriter<PlayerMoveEvent>, kb: Res<Input<KeyCode>>, mut query: Query<(Entity, &mut Transform, &mut Player)>) {
     let (entity, mut trans, mut player) = query.single_mut();
     let local_fwd = trans.forward();
@@ -36,22 +38,22 @@ pub(crate) fn keyboard_controls(mut writer: EventWriter<PlayerMoveEvent>, kb: Re
     let mut movement = Vec3::new(0., 0., 0.);
 
     if kb.pressed(KeyCode::Space) {
-        movement.y += 0.125;
+        movement.y += SPEED;
     }
     if kb.pressed(KeyCode::LShift) {
-        movement.y -= 0.125;
+        movement.y -= SPEED;
     }
     if kb.pressed(KeyCode::W) {
-        movement += local_fwd * 0.125;
+        movement += local_fwd * SPEED;
     }
     if kb.pressed(KeyCode::S) {
-        movement -= local_fwd * 0.125;
+        movement -= local_fwd * SPEED;
     }
     if kb.pressed(KeyCode::D) {
-        movement += local_right * 0.125;
+        movement += local_right * SPEED;
     }
     if kb.pressed(KeyCode::A) {
-        movement -= local_right * 0.125;
+        movement -= local_right * SPEED;
     }
 
     let old_position = player.position;

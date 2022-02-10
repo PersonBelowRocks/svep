@@ -58,7 +58,9 @@ const CHUNK_SIZE_F64: f64 = CHUNK_SIZE as f64;
 //                                 draw meshes for any other chunk than the one it's working on, we will
 //                                 have to submit the old chunk for re-meshing along with the new chunk.
 //
-//     3)
+//     3) NOT CORRECT! Current implementation gives each worker a pointer to all adjacent chunks, no
+//        asking is happening! This may however change in the future.
+//
 //   *---- mesh worker 1
 //   |
 //   |            mesh worker 2 ----*  Our chunks are currently being meshed, notice the voxel in
@@ -121,7 +123,7 @@ impl ChunkManager {
     }
 
     pub(crate) fn generate_new<G: NoiseFn<[f64; 3]>>(noisegen: G, pos: ChunkPosition) -> Chunk {
-        let mut vol: Volume<_, 32> = Volume::filled(Voxel::inactive());
+        let mut vol: Volume<_, 32> = Volume::filled(Voxel::active());
 
         for idx in vol.iter_indices() {
             let x = (idx.0 as f64 / CHUNK_SIZE_F64) + (pos.x as f64);
@@ -129,8 +131,8 @@ impl ChunkManager {
             let z = (idx.2 as f64 / CHUNK_SIZE_F64) + (pos.z as f64);
 
             let noise = noisegen.get([x/2.0, y/2.0, z/2.0]);
-            if noise > PERLIN_THRESHOLD {
-                vol[idx].active = true;
+            if noise < PERLIN_THRESHOLD {
+                vol[idx].active = false;
             }
         }
 
@@ -170,8 +172,14 @@ impl ChunkManager {
             let this_chunk_registry = self.chunks.clone();
 
             self.worker_pool.execute(move || {
-                let size = this_chunk_registry.read().unwrap().len();
-                this_tx.send(chunk.create_mesh()).unwrap();
+                let chunk_registry = this_chunk_registry.read().unwrap();
+
+                let mut neighbor_chunks = [None, None, None, None, None, None];
+                for (idx, neighbor_chunk_pos) in neighbor_vecs(chunk.position()).into_iter().enumerate() {
+                    neighbor_chunks[idx] = chunk_registry.get(&neighbor_chunk_pos).cloned();
+                }
+
+                this_tx.send(chunk.create_mesh(neighbor_chunks)).unwrap();
             });
         }
 
@@ -183,4 +191,16 @@ impl ChunkManager {
 
         collected
     }
+}
+
+#[inline(always)]
+pub(crate) fn neighbor_vecs(vec: IVec3) -> [IVec3; 6] {
+    [
+        IVec3::new(0, 1, 0),
+        IVec3::new(0, -1, 0),
+        IVec3::new(1, 0, 0),
+        IVec3::new(-1, 0, 0),
+        IVec3::new(0, 0, 1),
+        IVec3::new(0, 0, -1),
+    ].map(|offset| offset + vec)
 }
