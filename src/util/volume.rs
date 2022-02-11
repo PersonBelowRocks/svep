@@ -80,6 +80,11 @@ impl<T, const SIZE: usize> Volume<T, SIZE> {
 impl<'volume, T, const SIZE: usize> Iterator for VolumeIterator<'volume, T, SIZE> {
     type Item = (VolumeIdx, &'volume T);
     fn next(&mut self) -> Option<Self::Item> {
+
+        if self.idx.2 >= SIZE {
+            return None
+        }
+
         let item = &self.vol[self.idx];
         let item_idx = self.idx;
 
@@ -94,10 +99,6 @@ impl<'volume, T, const SIZE: usize> Iterator for VolumeIterator<'volume, T, SIZE
             self.idx.2 += 1;
         }
 
-        if self.idx.2 >= SIZE {
-            return None
-        }
-
         Some((item_idx, item))
     }
 }
@@ -106,6 +107,10 @@ impl<const SIZE: usize> Iterator for VolumeIndexIterator<SIZE> {
     type Item = VolumeIdx;
     fn next(&mut self) ->  Option<Self::Item> {
         let index_before = self.0;
+
+        if self.0.2 >= SIZE {
+            return None
+        }
 
         self.0.0 += 1;
         if self.0.0 >= SIZE {
@@ -116,10 +121,6 @@ impl<const SIZE: usize> Iterator for VolumeIndexIterator<SIZE> {
         if self.0.1 >= SIZE {
             self.0.1 = 0;
             self.0.2 += 1;
-        }
-
-        if self.0.2 >= SIZE {
-            return None
         }
 
         Some(index_before)
@@ -197,5 +198,26 @@ mod tests {
         // Did our changes happen?
         assert_eq!(volume[(4, 4, 4)], 12*2);
         assert_eq!(volume[(7, 3, 6)], 12*2);
+    }
+
+    #[test]
+    fn iter_idx() {
+        let mut volume: Volume<u64, 2> = Volume::filled(0u64);
+
+        let mut it = volume.iter_indices();
+
+        assert_eq!(it.next(), Some((0, 0, 0)));
+        assert_eq!(it.next(), Some((1, 0, 0)));
+
+        assert_eq!(it.next(), Some((0, 1, 0)));
+        assert_eq!(it.next(), Some((1, 1, 0)));
+
+        assert_eq!(it.next(), Some((0, 0, 1)));
+        assert_eq!(it.next(), Some((1, 0, 1)));
+
+        assert_eq!(it.next(), Some((0, 1, 1)));
+        assert_eq!(it.next(), Some((1, 1, 1)));
+
+        assert_eq!(it.next(), None);
     }
 }
